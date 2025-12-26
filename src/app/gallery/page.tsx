@@ -25,6 +25,15 @@ const STATUS_BADGES = {
     failed: { label: 'Failed', icon: XCircle, className: 'bg-red-500/20 text-red-400 border-red-500/30' },
 };
 
+const EXAMPLE_STYLES = [
+    { style: 'Modern', room: 'Living Room', description: 'Clean lines, neutral colors, and minimalist furniture' },
+    { style: 'Scandinavian', room: 'Bedroom', description: 'Light wood, cozy textiles, and hygge atmosphere' },
+    { style: 'Industrial', room: 'Kitchen', description: 'Exposed brick, metal accents, and raw materials' },
+    { style: 'Bohemian', room: 'Living Room', description: 'Colorful textiles, plants, and eclectic decor' },
+    { style: 'Japanese', room: 'Office', description: 'Zen minimalism with natural materials' },
+    { style: 'Luxury', room: 'Bathroom', description: 'Marble accents, gold details, and elegant finishes' },
+];
+
 export default function GalleryPage() {
     const { user, isLoading: isUserLoading } = useUser();
 
@@ -55,15 +64,53 @@ export default function GalleryPage() {
 
     if (!user) {
         return (
-            <div className="min-h-screen flex flex-col items-center justify-center p-4">
-                <ImageIcon className="h-16 w-16 text-muted-foreground mb-4" />
-                <h1 className="text-2xl font-bold mb-2">Sign in to view your gallery</h1>
-                <p className="text-muted-foreground mb-6">Your past transformations will appear here</p>
-                <Link href="/login">
-                    <Button className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white border-0">
-                        Sign In
-                    </Button>
-                </Link>
+            <div className="container mx-auto px-4 py-8">
+                <div className="max-w-6xl mx-auto">
+                    <div className="text-center mb-12">
+                        <h1 className="text-3xl font-bold mb-2">Transform Examples</h1>
+                        <p className="text-muted-foreground">
+                            See what AI can do with your room photos
+                        </p>
+                    </div>
+
+                    {/* Example Transformations */}
+                    <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-12">
+                        {EXAMPLE_STYLES.map((example, index) => (
+                            <Card
+                                key={index}
+                                className="bg-card/50 backdrop-blur-xl border-white/10 overflow-hidden group hover:border-violet-500/50 transition-colors"
+                            >
+                                <div className="aspect-[4/3] relative overflow-hidden bg-gradient-to-br from-violet-900/50 to-fuchsia-900/50">
+                                    <div className="absolute inset-0 flex items-center justify-center">
+                                        <div className="text-center p-4">
+                                            <div className="w-16 h-16 mx-auto mb-3 rounded-2xl bg-gradient-to-br from-violet-500/30 to-fuchsia-500/30 flex items-center justify-center">
+                                                <ImageIcon className="h-8 w-8 text-violet-300" />
+                                            </div>
+                                            <p className="text-lg font-semibold text-white">{example.style}</p>
+                                            <p className="text-sm text-violet-200">{example.room}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <CardContent className="p-4">
+                                    <p className="text-sm text-muted-foreground">{example.description}</p>
+                                </CardContent>
+                            </Card>
+                        ))}
+                    </div>
+
+                    {/* CTA */}
+                    <Card className="bg-gradient-to-r from-violet-500/10 to-fuchsia-500/10 border-violet-500/30">
+                        <CardContent className="flex flex-col items-center justify-center py-12">
+                            <h2 className="text-2xl font-bold mb-2">Ready to transform your space?</h2>
+                            <p className="text-muted-foreground mb-6">Sign in to get 3 free credits and start creating</p>
+                            <Link href="/login">
+                                <Button className="bg-gradient-to-r from-violet-500 to-fuchsia-500 hover:from-violet-600 hover:to-fuchsia-600 text-white border-0 h-12 px-8 text-lg">
+                                    Get Started Free
+                                </Button>
+                            </Link>
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
         );
     }
