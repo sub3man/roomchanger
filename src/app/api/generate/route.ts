@@ -137,16 +137,16 @@ export async function POST(request: NextRequest) {
                     'Content-Type': 'application/json',
                 },
                 body: JSON.stringify({
-                    // Using stability-ai/sdxl model
+                    // Using stability-ai/sdxl model for img2img
                     version: '7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc',
                     input: {
-                        prompt: prompt,
+                        prompt: `${prompt}, same room layout, same perspective, same furniture arrangement`,
                         image: imageUrl,
                         num_outputs: 1,
                         guidance_scale: 7.5,
-                        prompt_strength: 0.8,
+                        prompt_strength: 0.4, // Lower = keep more of original (0.4 = 60% original preserved)
                         num_inference_steps: 30,
-                        negative_prompt: 'blurry, low quality, distorted, deformed, ugly, bad proportions, watermark, text',
+                        negative_prompt: 'different room, different layout, different perspective, blurry, low quality, distorted, deformed, ugly, watermark, text',
                     },
                 }),
             });
