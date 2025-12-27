@@ -13,44 +13,16 @@ function getSupabaseClient() {
     return createClient(supabaseUrl, supabaseServiceKey);
 }
 
-// Helper function to poll Replicate for results
-async function pollForResult(url: string, token: string, timeout: number = 30000): Promise<any> {
-    const startTime = Date.now();
-
-    while (Date.now() - startTime < timeout) {
-        const response = await fetch(url, {
-            headers: { 'Authorization': `Token ${token}` },
-        });
-
-        if (!response.ok) {
-            throw new Error('Failed to fetch prediction status');
-        }
-
-        const data = await response.json();
-
-        if (data.status === 'succeeded') {
-            return data;
-        } else if (data.status === 'failed') {
-            throw new Error(data.error || 'Prediction failed');
-        }
-
-        // Wait 500ms before next poll
-        await new Promise(resolve => setTimeout(resolve, 500));
-    }
-
-    return null;
-}
-
 // Style prompts for different design styles
 const STYLE_PROMPTS: Record<string, string> = {
-    'modern': 'modern contemporary style, clean lines, neutral colors, minimalist furniture',
-    'minimalist': 'minimalist style, white walls, simple furniture, zen aesthetic, uncluttered',
-    'scandinavian': 'scandinavian style, light wood, cozy textiles, hygge atmosphere, natural light',
-    'industrial': 'industrial style, exposed brick, metal accents, Edison bulbs, raw materials',
-    'bohemian': 'bohemian style, colorful textiles, plants, eclectic decor, layered patterns',
-    'mid-century': 'mid-century modern style, retro furniture, warm wood tones, vintage accents',
-    'japanese': 'japanese style, zen minimalism, natural materials, tatami, shoji screens',
-    'luxury': 'luxury style, elegant furniture, marble accents, gold details, crystal chandeliers',
+    'modern': 'modern contemporary interior design, clean lines, neutral colors, minimalist furniture, professional',
+    'minimalist': 'minimalist interior design, white walls, simple furniture, zen aesthetic, uncluttered, clean',
+    'scandinavian': 'scandinavian interior design, light wood, cozy textiles, hygge atmosphere, natural light, warm',
+    'industrial': 'industrial interior design, exposed brick, metal accents, Edison bulbs, raw materials, urban',
+    'bohemian': 'bohemian interior design, colorful textiles, plants, eclectic decor, layered patterns, artistic',
+    'mid-century': 'mid-century modern interior design, retro furniture, warm wood tones, vintage accents, classic',
+    'japanese': 'japanese interior design, zen minimalism, natural materials, tatami, shoji screens, peaceful',
+    'luxury': 'luxury interior design, elegant furniture, marble accents, gold details, sophisticated, premium',
 };
 
 const ROOM_PROMPTS: Record<string, string> = {
@@ -66,7 +38,7 @@ function buildPrompt(style: string, roomType: string): string {
     const stylePrompt = STYLE_PROMPTS[style] || STYLE_PROMPTS['modern'];
     const roomPrompt = ROOM_PROMPTS[roomType] || 'room';
 
-    return `Beautiful ${stylePrompt} ${roomPrompt}, interior design photograph, professional photography, 8k, high resolution, photorealistic, well-lit, architectural digest quality`;
+    return `A beautiful ${stylePrompt} ${roomPrompt}, interior design photograph, professional photography, high resolution, photorealistic, well-lit, architectural digest quality, 4k`;
 }
 
 export async function POST(request: NextRequest) {
@@ -141,7 +113,7 @@ export async function POST(request: NextRequest) {
                 .from('generations')
                 .update({
                     status: 'completed',
-                    generated_image_url: imageUrl, // Return original as demo
+                    generated_image_url: imageUrl,
                 })
                 .eq('id', generation.id);
 
@@ -153,49 +125,65 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Call Replicate API
+        // Call Replicate API using the official model format
         const prompt = buildPrompt(style, roomType);
 
-        let predictionUrl = '';
-
         try {
-            // Use img2img model for room transformation
-            const response = await fetch('https://api.replicate.com/v1/predictions', {
+            // Create prediction using Replicate's predictions API
+            const createResponse = await fetch('https://api.replicate.com/v1/predictions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Bearer ${replicateToken}`,
+                    'Authorization': `Token ${replicateToken}`,
                     'Content-Type': 'application/json',
-                    'Prefer': 'wait',
                 },
                 body: JSON.stringify({
-                    // SDXL img2img model
-                    version: 'a00d0b7dcbb9c3fbb34ba87d2d5b46c56969c84a628bf778a7fdaec30b1b99c5',
+                    // Using stability-ai/sdxl model
+                    version: '7762fd07cf82c948538e41f63f77d685e02b063e37e496e96eefd46c929f9bdc',
                     input: {
-                        image: imageUrl,
                         prompt: prompt,
-                        negative_prompt: 'blurry, low quality, distorted, deformed, ugly, cartoon, anime',
+                        image: imageUrl,
                         num_outputs: 1,
                         guidance_scale: 7.5,
-                        prompt_strength: 0.6,
-                        num_inference_steps: 25,
-                        scheduler: 'K_EULER',
+                        prompt_strength: 0.8,
+                        num_inference_steps: 30,
+                        negative_prompt: 'blurry, low quality, distorted, deformed, ugly, bad proportions, watermark, text',
                     },
                 }),
             });
 
-            if (!response.ok) {
-                const errorData = await response.json();
-                console.error('Replicate API error:', JSON.stringify(errorData));
-                throw new Error(`Replicate API error: ${errorData.detail || 'Unknown error'}`);
+            if (!createResponse.ok) {
+                const errorText = await createResponse.text();
+                console.error('Replicate create prediction error:', errorText);
+                throw new Error(`Replicate API error: ${createResponse.status}`);
             }
 
-            const prediction = await response.json();
-            predictionUrl = prediction.urls?.get;
+            const prediction = await createResponse.json();
+            console.log('Prediction created:', prediction.id);
 
-            if (!predictionUrl) {
-                // If response contains output directly (for 'Prefer: wait')
-                if (prediction.output) {
-                    const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+            // Poll for result
+            let attempts = 0;
+            const maxAttempts = 60; // 60 seconds max
+
+            while (attempts < maxAttempts) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+
+                const statusResponse = await fetch(prediction.urls.get, {
+                    headers: {
+                        'Authorization': `Token ${replicateToken}`,
+                    },
+                });
+
+                if (!statusResponse.ok) {
+                    console.error('Failed to get prediction status');
+                    attempts++;
+                    continue;
+                }
+
+                const status = await statusResponse.json();
+                console.log(`Prediction status (attempt ${attempts + 1}):`, status.status);
+
+                if (status.status === 'succeeded') {
+                    const outputUrl = Array.isArray(status.output) ? status.output[0] : status.output;
 
                     await supabase
                         .from('generations')
@@ -210,11 +198,22 @@ export async function POST(request: NextRequest) {
                         status: 'completed',
                         generated_image_url: outputUrl,
                     });
+                } else if (status.status === 'failed') {
+                    console.error('Prediction failed:', status.error);
+                    throw new Error(status.error || 'Prediction failed');
                 }
-                throw new Error('No prediction URL returned');
+
+                attempts++;
             }
+
+            // Timeout - return processing status
+            return NextResponse.json({
+                id: generation.id,
+                status: 'processing',
+            });
+
         } catch (error: any) {
-            console.error('Replicate API error, generation failed:', error.message || error);
+            console.error('Replicate API error:', error.message);
 
             await supabase
                 .from('generations')
@@ -232,37 +231,6 @@ export async function POST(request: NextRequest) {
                 { status: 500 }
             );
         }
-
-        // Poll for result (SDXL is usually 10-30 seconds)
-        try {
-            const result = await pollForResult(predictionUrl, replicateToken, 60000);
-
-            if (result && result.output) {
-                const outputUrl = Array.isArray(result.output) ? result.output[0] : result.output;
-
-                await supabase
-                    .from('generations')
-                    .update({
-                        status: 'completed',
-                        generated_image_url: outputUrl,
-                    })
-                    .eq('id', generation.id);
-
-                return NextResponse.json({
-                    id: generation.id,
-                    status: 'completed',
-                    generated_image_url: outputUrl,
-                });
-            }
-        } catch (pollError) {
-            console.error('Polling error:', pollError);
-        }
-
-        // If polling timed out, return processing status (client will poll)
-        return NextResponse.json({
-            id: generation.id,
-            status: 'processing',
-        });
 
     } catch (error: unknown) {
         console.error('Generation API error:', error);
