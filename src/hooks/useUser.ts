@@ -35,7 +35,7 @@ export function useUser() {
                         .insert({
                             id: session.user.id,
                             email: session.user.email,
-                            credits: 3,
+                            credits: 5,
                             is_pro: false,
                         })
                         .select()

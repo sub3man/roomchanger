@@ -159,7 +159,7 @@ export default function HomePage() {
               <div className="flex items-center justify-center gap-6 mt-10 text-sm text-muted-foreground">
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-emerald-400" />
-                  <span>3 Free Credits</span>
+                  <span>5 Free Credits</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <CheckCircle className="h-4 w-4 text-emerald-400" />
@@ -257,6 +257,33 @@ export default function HomePage() {
                 </>
               )}
             </Button>
+
+            {/* No Credits - Payment CTA */}
+            {credits <= 0 && (
+              <Card className="bg-gradient-to-r from-amber-500/10 to-orange-500/10 border-amber-500/30">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-500/20 to-orange-500/20 flex items-center justify-center shrink-0">
+                      <Sparkles className="h-6 w-6 text-amber-400" />
+                    </div>
+                    <div className="flex-1">
+                      <h3 className="font-semibold text-lg mb-1">Need More Credits?</h3>
+                      <p className="text-sm text-muted-foreground mb-4">
+                        You've used all your free credits. Upgrade to continue transforming rooms.
+                      </p>
+                      <div className="flex flex-wrap gap-3">
+                        <Button className="bg-gradient-to-r from-amber-500 to-orange-500 hover:from-amber-600 hover:to-orange-600 text-white border-0">
+                          Get 10 Credits - $9.99
+                        </Button>
+                        <Button variant="outline" className="border-amber-500/30 text-amber-200 hover:bg-amber-500/10">
+                          Get 50 Credits - $39.99
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            )}
 
             {error && (
               <div className="p-4 rounded-lg bg-red-500/10 border border-red-500/20 text-red-400 text-sm">
