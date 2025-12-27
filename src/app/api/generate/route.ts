@@ -153,42 +153,68 @@ export async function POST(request: NextRequest) {
             });
         }
 
-        // Call Replicate API with SDXL Turbo (faster & cheaper)
+        // Call Replicate API
         const prompt = buildPrompt(style, roomType);
 
-        // Try SDXL Turbo first (5x cheaper, 10x faster)
         let predictionUrl = '';
-        let usedFallback = false;
 
         try {
-            const turboResponse = await fetch('https://api.replicate.com/v1/predictions', {
+            // Use img2img model for room transformation
+            const response = await fetch('https://api.replicate.com/v1/predictions', {
                 method: 'POST',
                 headers: {
-                    'Authorization': `Token ${replicateToken}`,
+                    'Authorization': `Bearer ${replicateToken}`,
                     'Content-Type': 'application/json',
+                    'Prefer': 'wait',
                 },
                 body: JSON.stringify({
-                    version: 'stability-ai/sdxl:39ed52f2a78e934b3ba6e2a89f5b1c712de7dfea535525255b1aa35c5565e08b',
+                    // SDXL img2img model
+                    version: 'a00d0b7dcbb9c3fbb34ba87d2d5b46c56969c84a628bf778a7fdaec30b1b99c5',
                     input: {
                         image: imageUrl,
                         prompt: prompt,
-                        negative_prompt: 'blurry, low quality, distorted, deformed, ugly',
+                        negative_prompt: 'blurry, low quality, distorted, deformed, ugly, cartoon, anime',
                         num_outputs: 1,
                         guidance_scale: 7.5,
-                        prompt_strength: 0.5, // Keep 50% of original structure
-                        num_inference_steps: 20,
+                        prompt_strength: 0.6,
+                        num_inference_steps: 25,
+                        scheduler: 'K_EULER',
                     },
                 }),
             });
 
-            if (turboResponse.ok) {
-                const prediction = await turboResponse.json();
-                predictionUrl = prediction.urls?.get;
-            } else {
-                throw new Error('SDXL request failed');
+            if (!response.ok) {
+                const errorData = await response.json();
+                console.error('Replicate API error:', JSON.stringify(errorData));
+                throw new Error(`Replicate API error: ${errorData.detail || 'Unknown error'}`);
             }
-        } catch (error) {
-            console.error('Replicate API error, generation failed:', error);
+
+            const prediction = await response.json();
+            predictionUrl = prediction.urls?.get;
+
+            if (!predictionUrl) {
+                // If response contains output directly (for 'Prefer: wait')
+                if (prediction.output) {
+                    const outputUrl = Array.isArray(prediction.output) ? prediction.output[0] : prediction.output;
+
+                    await supabase
+                        .from('generations')
+                        .update({
+                            status: 'completed',
+                            generated_image_url: outputUrl,
+                        })
+                        .eq('id', generation.id);
+
+                    return NextResponse.json({
+                        id: generation.id,
+                        status: 'completed',
+                        generated_image_url: outputUrl,
+                    });
+                }
+                throw new Error('No prediction URL returned');
+            }
+        } catch (error: any) {
+            console.error('Replicate API error, generation failed:', error.message || error);
 
             await supabase
                 .from('generations')
@@ -202,7 +228,7 @@ export async function POST(request: NextRequest) {
                 .eq('id', userId);
 
             return NextResponse.json(
-                { error: 'AI generation failed' },
+                { error: 'AI generation failed. Please try again.' },
                 { status: 500 }
             );
         }
